@@ -20,9 +20,7 @@ class TaskItem extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         leading: Checkbox(
           value: task.isDone,
@@ -51,27 +49,28 @@ class TaskItem extends StatelessWidget {
                   ),
                 ),
               ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(Icons.star, size: 16, color: Colors.amber.shade700),
-                const SizedBox(width: 4),
-                Text(
-                  '${task.xpReward} XP',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
+            if (task.pomodoroCount > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.check_circle,
+                      size: 14,
+                      color: Colors.green,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${task.pomodoroCount} Pomodoro${task.pomodoroCount > 1 ? 's' : ''} completado${task.pomodoroCount > 1 ? 's' : ''}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.green,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Icon(Icons.timer, size: 16, color: Colors.red.shade700),
-                const SizedBox(width: 4),
-                Text(
-                  '${task.pomodoroCount} 🍅',
-                  style: const TextStyle(fontSize: 12),
-                ),
-              ],
-            ),
+              ),
           ],
         ),
         trailing: Row(

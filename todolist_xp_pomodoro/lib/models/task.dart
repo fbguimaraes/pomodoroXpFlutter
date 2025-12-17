@@ -5,7 +5,6 @@ class Task {
   final String title;
   final String description;
   final bool isDone;
-  final int xpReward;
   final int pomodoroCount;
 
   Task({
@@ -13,31 +12,45 @@ class Task {
     required this.title,
     required this.description,
     this.isDone = false,
-    this.xpReward = 50,
     this.pomodoroCount = 0,
   });
 
-  // Converter Task para Map
+  // Copiar Task com modificações
+  Task copyWith({
+    String? id,
+    String? title,
+    String? description,
+    bool? isDone,
+    int? pomodoroCount,
+  }) {
+    return Task(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      isDone: isDone ?? this.isDone,
+      pomodoroCount: pomodoroCount ?? this.pomodoroCount,
+    );
+  }
+
+  // Converter para Map
   Map<String, dynamic> toMap() {
     return {
       'id': id,
       'title': title,
       'description': description,
       'isDone': isDone,
-      'xpReward': xpReward,
       'pomodoroCount': pomodoroCount,
     };
   }
 
-  // Criar Task a partir de Map
+  // Criar a partir de Map
   factory Task.fromMap(Map<String, dynamic> map) {
     return Task(
       id: map['id'],
       title: map['title'],
       description: map['description'],
       isDone: map['isDone'],
-      xpReward: map['xpReward'],
-      pomodoroCount: map['pomodoroCount'],
+      pomodoroCount: map['pomodoroCount'] ?? 0,
     );
   }
 
@@ -46,23 +59,4 @@ class Task {
 
   // Criar a partir de JSON
   factory Task.fromJson(String source) => Task.fromMap(json.decode(source));
-
-  // Copiar Task com modificações
-  Task copyWith({
-    String? id,
-    String? title,
-    String? description,
-    bool? isDone,
-    int? xpReward,
-    int? pomodoroCount,
-  }) {
-    return Task(
-      id: id ?? this.id,
-      title: title ?? this.title,
-      description: description ?? this.description,
-      isDone: isDone ?? this.isDone,
-      xpReward: xpReward ?? this.xpReward,
-      pomodoroCount: pomodoroCount ?? this.pomodoroCount,
-    );
-  }
 }

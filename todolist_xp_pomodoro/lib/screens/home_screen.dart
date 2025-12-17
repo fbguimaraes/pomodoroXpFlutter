@@ -1,9 +1,6 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/task.dart';
-import '../models/user_progress.dart';
-import '../widgets/xp_bar.dart';
 import '../widgets/task_item.dart';
 import 'pomodoro_screen.dart';
 
@@ -16,50 +13,45 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   List<Task> _tasks = [];
-  UserProgress _userProgress = UserProgress();
-  
+  bool _hasActiveTimer = false;
+
   @override
   void initState() {
     super.initState();
     _loadData();
+    _checkActiveTimer();
   }
 
-  // Carregar dados salvos
+  // Carregar tarefas salvas
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
-    
-    // Carregar progresso do usuário
-    final progressMap = prefs.getString('user_progress');
-    if (progressMap != null) {
-      setState(() {
-        _userProgress = UserProgress.fromMap(json.decode(progressMap));
-      });
-    }
-    
-    // Carregar tarefas
     final tasksJson = prefs.getStringList('tasks') ?? [];
     setState(() {
       _tasks = tasksJson.map((json) => Task.fromJson(json)).toList();
     });
   }
 
-  // Salvar dados
+  // Salvar tarefas
   Future<void> _saveData() async {
     final prefs = await SharedPreferences.getInstance();
-    
-    // Salvar progresso
-    await prefs.setString('user_progress', json.encode(_userProgress.toMap()));
-    
-    // Salvar tarefas
     final tasksJson = _tasks.map((task) => task.toJson()).toList();
     await prefs.setStringList('tasks', tasksJson);
+  }
+
+  // Verificar se há timer ativo
+  Future<void> _checkActiveTimer() async {
+    final prefs = await SharedPreferences.getInstance();
+    final timerSeconds = prefs.getInt('timer_seconds_remaining');
+    setState(() {
+      _hasActiveTimer = timerSeconds != null && timerSeconds > 0;
+    });
   }
 
   // Adicionar nova tarefa
   void _addTask() {
     final titleController = TextEditingController();
     final descriptionController = TextEditingController();
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -94,11 +86,13 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () {
               if (titleController.text.isNotEmpty) {
                 setState(() {
-                  _tasks.add(Task(
-                    id: DateTime.now().toString(),
-                    title: titleController.text,
-                    description: descriptionController.text,
-                  ));
+                  _tasks.add(
+                    Task(
+                      id: DateTime.now().toString(),
+                      title: titleController.text,
+                      description: descriptionController.text,
+                    ),
+                  );
                 });
                 _saveData();
                 Navigator.pop(context);
@@ -115,14 +109,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _toggleTask(int index) {
     setState(() {
       final task = _tasks[index];
-      final updatedTask = task.copyWith(isDone: !task.isDone);
-      _tasks[index] = updatedTask;
-      
-      // Se a tarefa foi marcada como concluída, ganhar XP
-      if (updatedTask.isDone && !task.isDone) {
-        _userProgress = _userProgress.addXp(task.xpReward);
-        _showXpGainedSnackbar(task.xpReward);
-      }
+      _tasks[index] = task.copyWith(isDone: !task.isDone);
     });
     _saveData();
   }
@@ -155,67 +142,83 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Iniciar Pomodoro
-  void _startPomodoro(int index) {
-    Navigator.push(
+  // Navegar para tela do Pomodoro (genérico)
+  void _openPomodoro() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const PomodoroScreen()),
+    );
+    _checkActiveTimer();
+  }
+
+  // Iniciar Pomodoro para tarefa específica
+  void _startPomodoroForTask(int index) async {
+    final task = _tasks[index];
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => PomodoroScreen(
-          task: _tasks[index],
-          onPomodoroComplete: (xpGained) {
+          task: task,
+          onPomodoroComplete: () {
             setState(() {
-              _userProgress = _userProgress.addXp(xpGained);
-              _tasks[index] = _tasks[index].copyWith(
-                pomodoroCount: _tasks[index].pomodoroCount + 1,
+              _tasks[index] = task.copyWith(
+                pomodoroCount: task.pomodoroCount + 1,
               );
             });
             _saveData();
-            _showXpGainedSnackbar(xpGained);
           },
         ),
       ),
     );
-  }
-
-  // Mostrar notificação de XP ganho
-  void _showXpGainedSnackbar(int xp) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('🎉 Você ganhou $xp XP!'),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    _checkActiveTimer();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('📝 ToDoList XP'),
+        title: const Text('📝 ToDoList + Pomodoro'),
         backgroundColor: Colors.blue.shade700,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: Stack(
+              children: [
+                const Icon(Icons.timer),
+                if (_hasActiveTimer)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Text('●', style: TextStyle(fontSize: 8)),
+                    ),
+                  ),
+              ],
+            ),
+            onPressed: _openPomodoro,
+            tooltip: 'Abrir Pomodoro',
+          ),
+        ],
       ),
       body: Column(
         children: [
-          // Barra de XP
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: XpBar(
-              level: _userProgress.level,
-              currentXp: _userProgress.totalXp,
-              xpForNextLevel: _userProgress.xpForNextLevel,
-              progressPercentage: _userProgress.progressPercentage,
-            ),
-          ),
-          
           // Estatísticas
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.all(16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildStatCard('Total', _tasks.length.toString(), Icons.list, Colors.blue),
+                _buildStatCard(
+                  'Total',
+                  _tasks.length.toString(),
+                  Icons.list,
+                  Colors.blue,
+                ),
                 _buildStatCard(
                   'Concluídas',
                   _tasks.where((t) => t.isDone).length.toString(),
@@ -231,9 +234,9 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
-          
-          const SizedBox(height: 16),
-          
+
+          const SizedBox(height: 8),
+
           // Lista de tarefas
           Expanded(
             child: _tasks.isEmpty
@@ -241,7 +244,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.inbox, size: 80, color: Colors.grey.shade400),
+                        Icon(
+                          Icons.inbox,
+                          size: 80,
+                          color: Colors.grey.shade400,
+                        ),
                         const SizedBox(height: 16),
                         Text(
                           'Nenhuma tarefa ainda',
@@ -268,7 +275,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         task: _tasks[index],
                         onToggle: () => _toggleTask(index),
                         onDelete: () => _deleteTask(index),
-                        onPomodoro: () => _startPomodoro(index),
+                        onPomodoro: () => _startPomodoroForTask(index),
                       );
                     },
                   ),
@@ -284,13 +291,18 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, MaterialColor color) {
+  Widget _buildStatCard(
+    String label,
+    String value,
+    IconData icon,
+    MaterialColor color,
+  ) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -304,13 +316,7 @@ class _HomeScreenState extends State<HomeScreen> {
               color: color,
             ),
           ),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: color.shade700,
-            ),
-          ),
+          Text(label, style: TextStyle(fontSize: 12, color: color.shade700)),
         ],
       ),
     );
